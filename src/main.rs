@@ -10,6 +10,7 @@ extern crate vecmath;
 extern crate image;
 extern crate texture;
 extern crate window;
+extern crate input;
 
 use window::Window;
 
@@ -53,6 +54,7 @@ use piston::input::{
     TextEvent,
     UpdateEvent,
 };
+use input::mouse::MouseRelativeEvent;
 use piston::window::{WindowSettings, Size};
 
 use std::path::Path;
@@ -226,6 +228,8 @@ fn main() {
             //    _ => println!("yay"),
            // }
         }
+
+        event.mouse_relative(|dx, dy| println!("Relative mouse moved '{} {}'", dx, dy));
     }
 }
 
