@@ -113,13 +113,15 @@ fn main() {
     println!("The first image: {}", first_img);
     let img = image::open(&Path::new(&first_img)).unwrap();
     println!("The dimensions are: {:?}", img.dimensions());
-    demo.images[0] = img;
 
     for event in event_iter {
+        use graphics::*;
         ui.handle_event(&event);
         if let Some(args) = event.render_args() {
             gl.draw(args.viewport(), |c, gl| {
+                clear([1.0, 0.0, 0.4, 0.0], gl);
                 draw_ui(c, gl, &mut ui, &mut demo);
+                ui.draw_if_changed(c, gl);
             });
         }
     }
@@ -131,20 +133,19 @@ fn main() {
 fn draw_ui(c: Context, gl: &mut GlGraphics, ui: &mut Ui, demo: &mut DemoApp) {
 
     // Sets a color to clear the background with before the Ui draws the widgets.
-    Background::new().color(rgb(0.2, 0.2, 0.2)).set(ui);
+    // Background::new().color(rgb(0.2, 0.2, 0.2)).set(ui);
 
     // Calculate x and y coords for title (temporary until `Canvas`es are implemented, see #380).
     let title_x = (ui.win_w / 2.0) + 185.0;
     let title_y = (ui.win_h / 2.0) - 50.0;
+    println!("title_y = {}", title_y);
 
     // Label example.
     Label::new("Widget Demonstration")
-        .xy(title_x, title_y)
+        .xy(100.0, 100.0)
         .font_size(32)
         .color(rgb(1.0,1.0,1.0))
         .set(TITLE, ui);
-
-    ui.draw_if_changed(c, gl);
 }
 
 widget_ids! {
