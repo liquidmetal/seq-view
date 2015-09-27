@@ -9,6 +9,7 @@ extern crate glutin_window;
 extern crate vecmath;
 extern crate image;
 
+
 use conrod::{
     Background,
     Button,
@@ -34,17 +35,17 @@ use conrod::{
 use docopt::Docopt;
 use conrod::color::{self, rgb, white, black, red, green, blue, purple};
 use glutin_window::GlutinWindow;
-use graphics::Context;
 use opengl_graphics::{GlGraphics, OpenGL};
 use opengl_graphics::glyph_cache::GlyphCache;
 use piston::event_loop::{Events, EventLoop};
 use piston::input::{RenderEvent};
 use piston::window::{WindowSettings, Size};
 
-use image::GenericImage;
-use image::DynamicImage;
 use std::path::Path;
 use std::collections::HashMap;
+use graphics::Context;
+use graphics::default_draw_state;
+use graphics::clear;
 
 type Ui = conrod::Ui<GlyphCache<'static>>;
 
@@ -72,7 +73,7 @@ struct Args {
 }
 
 struct DemoApp {
-    images: HashMap<i32, DynamicImage>,
+    images: HashMap<i32, i32>,
 }
 
 impl DemoApp {
@@ -111,17 +112,20 @@ fn main() {
 
     let ref first_img = args.arg_file[0];
     println!("The first image: {}", first_img);
-    let img = image::open(&Path::new(&first_img)).unwrap();
-    println!("The dimensions are: {:?}", img.dimensions());
+    
+    let tex = opengl_graphics::Texture::from_path(Path::new(&args.arg_file[0])).unwrap();
+    use opengl_graphics::texture::ImageSize;
+    let size = tex.get_size();
+    let image   = graphics::Image::new().rect(graphics::rectangle::square(0.0, 0.0, 200.0));
 
     for event in event_iter {
-        use graphics::*;
         ui.handle_event(&event);
         if let Some(args) = event.render_args() {
             gl.draw(args.viewport(), |c, gl| {
                 clear([1.0, 0.0, 0.4, 0.0], gl);
+                image.draw(&tex, default_draw_state(), c.transform, gl);
                 draw_ui(c, gl, &mut ui, &mut demo);
-                ui.draw_if_changed(c, gl);
+                ui.draw(c, gl);
             });
         }
     }
