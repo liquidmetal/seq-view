@@ -9,7 +9,9 @@ extern crate glutin_window;
 extern crate vecmath;
 extern crate image;
 extern crate texture;
+extern crate window;
 
+use window::Window;
 
 use conrod::{
     Background,
@@ -39,7 +41,18 @@ use glutin_window::GlutinWindow;
 use opengl_graphics::{GlGraphics, OpenGL};
 use opengl_graphics::glyph_cache::GlyphCache;
 use piston::event_loop::{Events, EventLoop};
-use piston::input::{RenderEvent};
+use piston::input::{
+    RenderEvent,
+    IdleEvent,
+    PressEvent,
+    ReleaseEvent,
+    AfterRenderEvent,
+    CursorEvent,
+    FocusEvent,
+    ResizeEvent,
+    TextEvent,
+    UpdateEvent,
+};
 use piston::window::{WindowSettings, Size};
 
 use std::path::Path;
@@ -112,13 +125,16 @@ impl DemoApp {
         return self.num_frames;
     }
 
+    pub fn get_image_size(&self) -> Size {
+        return Size { width: self.width, height: self.height };
+    }
+
     pub fn render_frame(&mut self, c: Context, gl: &mut GlGraphics) {
         if !self.textures.contains_key(&self.current_frame) {
             let new_frame = self.current_frame;
             self.load_missing_frame(new_frame);
         }
         let ref tex = self.textures[&self.current_frame];
-        println!("Rendering frame {}", self.current_frame);
         self.image.draw(tex, default_draw_state(), c.transform, gl);
         return;
     }
@@ -142,43 +158,73 @@ impl DemoApp {
 fn main() {
     let args: Args = Docopt::new(USAGE).and_then(|d| d.decode()).unwrap_or_else(|e| e.exit());
     println!("{:?}", args);
-    
+
     let opengl = OpenGL::V3_2;
+    
     let window: GlutinWindow =
         WindowSettings::new(
             "Hello Conrod".to_string(),
-            Size { width: 1100, height: 550 }
+            Size { width: 100, height: 100},
         )
         .opengl(opengl)
         .exit_on_esc(true)
         .samples(4)
         .build()
         .unwrap();
-    let event_iter = window.events().ups(60).max_fps(60);
+
+    // This statement should come only after creating the window for some reason
     let mut gl = GlGraphics::new(opengl);
 
-    let assets = find_folder::Search::ParentsThenKids(3, 3)
-        .for_folder("assets").unwrap();
+    // The assets directory
+    let assets = find_folder::Search::ParentsThenKids(3, 3).for_folder("assets").unwrap();
+
+    // Load the font into the GPU
     let font_path = assets.join("fonts/NotoSans/NotoSans-Regular.ttf");
     let theme = Theme::default();
     let glyph_cache = GlyphCache::new(&font_path).unwrap();
+
     let mut ui = Ui::new(glyph_cache, theme);
+
+    // Load the initial frame into memory
     let mut demo = DemoApp::new(args.arg_file, args.flag_frame);
+    let sz2 = demo.get_image_size();
+    window.window.set_inner_size(sz2.width, sz2.height);
 
-    let mut frame = 0;
-
+    let event_iter = window.events().ups(60).max_fps(60);
     for event in event_iter {
         ui.handle_event(&event);
+
+        // Should render here
         if let Some(args) = event.render_args() {
             gl.draw(args.viewport(), |c, gl| {
                 clear([1.0, 0.0, 0.4, 0.0], gl);
                 draw_ui(c, gl, &mut ui, &mut demo);
                 ui.draw(c, gl);
             });
-            if frame > 10 {
-                demo.set_current_frame(10);
-            }
-            frame += 1;
+        }
+
+        // The mouse was pressed
+        if let Some(args) = event.press_args() {
+            println!("Mouse pressed");
+        }
+
+        // The mouse button was released
+        if let Some(args) = event.release_args() {
+            println!("Mouse released");
+            demo.set_current_frame(10);
+        }
+
+        // Idling around - probably a good time to load a new image?
+        if let Some(args) = event.idle_args() {
+        }
+
+        // Some key was pressed
+        if let Some(args) = event.text_args() {
+            let char_space = ' ';
+            //match args[0] as char {
+            //    char_space => println!("Space!"),
+            //    _ => println!("yay"),
+           // }
         }
     }
 }
@@ -187,14 +233,6 @@ fn main() {
 
 /// Draw the User Interface.
 fn draw_ui(c: Context, gl: &mut GlGraphics, ui: &mut Ui, demo: &mut DemoApp) {
-
-    // Sets a color to clear the background with before the Ui draws the widgets.
-    // Background::new().color(rgb(0.2, 0.2, 0.2)).set(ui);
-
-    // Calculate x and y coords for title (temporary until `Canvas`es are implemented, see #380).
-    let title_x = (ui.win_w / 2.0) + 185.0;
-    let title_y = (ui.win_h / 2.0) - 50.0;
-    println!("title_y = {}", title_y);
 
     // Label example.
     Label::new("Widget Demonstration")
@@ -209,15 +247,5 @@ fn draw_ui(c: Context, gl: &mut GlGraphics, ui: &mut Ui, demo: &mut DemoApp) {
 
 widget_ids! {
     TITLE,
-    BUTTON,
-    TITLE_PAD_SLIDER,
-    TOGGLE,
-    COLOR_SLIDER with 3,
-    SLIDER_HEIGHT,
-    FRAME_WIDTH,
-    TOGGLE_MATRIX with 64,
-    COLOR_SELECT,
-    CIRCLE_POSITION,
-    ENVELOPE_EDITOR with 4
 }
 
