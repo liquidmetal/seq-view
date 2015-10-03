@@ -54,7 +54,7 @@ use piston::input::{
     TextEvent,
     UpdateEvent,
 };
-use input::mouse::MouseRelativeEvent;
+use input::mouse::{MouseRelativeEvent, MouseCursorEvent};
 use piston::window::{WindowSettings, Size};
 
 use std::path::Path;
@@ -90,7 +90,7 @@ struct Args {
 }
 
 struct DemoApp {
-    num_frames: u32,
+    num_frames: usize,
     img_paths: Vec<String>,
     current_frame: u32,
     textures: HashMap<u32, opengl_graphics::Texture>,
@@ -111,7 +111,7 @@ impl DemoApp {
         hm.insert(current_frame, tex);
 
         return DemoApp {
-            num_frames: 0,
+            num_frames: s.len(),
             img_paths: s.clone(),
             current_frame: current_frame,
             textures: hm,
@@ -127,10 +127,6 @@ impl DemoApp {
     // Load the first image
     fn initialize(&self) {
         return;
-    }
-
-    pub fn get_num_images(&self) -> u32 {
-        return self.num_frames;
     }
 
     pub fn get_window_size(&self) -> Size {
@@ -183,6 +179,7 @@ impl DemoApp {
         if !self.textures.contains_key(&self.current_frame) {
             let new_frame = self.current_frame;
             self.load_missing_frame(new_frame);
+            println!("Loading the missing frame");
         }
         self.render_background(c, gl);
         self.render_image(c, gl);
@@ -193,6 +190,14 @@ impl DemoApp {
         assert!(new_frame < self.img_paths.len() as u32);
         self.current_frame = new_frame;
         return;
+    }
+
+    pub fn get_current_frame(&self) -> u32 {
+        return self.current_frame;
+    }
+
+    pub fn get_num_images(&self) -> usize {
+        return self.num_frames;
     }
 
     fn load_missing_frame(&mut self, ref new_frame: u32) {
@@ -239,6 +244,13 @@ fn main() {
     let mut demo = DemoApp::new(args.arg_file, args.flag_frame);
     //window.window.set_inner_size(sz2.width, sz2.height);
 
+    let mut mouse_pressed: bool = false;
+    let mut mouse_original_x: f64 = -1.0;
+    let mut mouse_original_y: f64 = -1.0;
+    let mut original_current_frame: u32 = 0;
+    let mut num_frames: usize = 0;
+    let mut num_frames_to_move: i32 = 0;
+
     let event_iter = window.events().ups(60).max_fps(60);
     for event in event_iter {
         ui.handle_event(&event);
@@ -247,20 +259,24 @@ fn main() {
         if let Some(args) = event.render_args() {
             gl.draw(args.viewport(), |c, gl| {
                 draw_ui(c, gl, &mut ui, &mut demo);
-                println!("x = {}, y = {}", ui.mouse.xy[0], ui.mouse.xy[1]);
                 ui.draw(c, gl);
             });
         }
 
         // The mouse was pressed
         if let Some(args) = event.press_args() {
-            println!("Mouse pressed");
+            mouse_pressed = true;
+            num_frames = demo.get_num_images();
+            original_current_frame = demo.get_current_frame();
+            //println!("Current frame = {}", original_current_frame);
+            println!("num frames = {}", num_frames);
         }
 
         // The mouse button was released
         if let Some(args) = event.release_args() {
-            println!("Mouse released");
-            demo.set_current_frame(10);
+            mouse_original_x = -1.0;
+            mouse_original_y = -1.0;
+            mouse_pressed = false;
         }
 
         // Idling around - probably a good time to load a new image?
@@ -280,7 +296,27 @@ fn main() {
             demo.set_window_size(args[0], args[1]);
         }
 
-        event.mouse_relative(|dx, dy| println!("Relative mouse moved '{} {}'", dx, dy));
+        event.mouse_cursor(|x, y| {
+            if(mouse_pressed == true && mouse_original_x == -1.0 && mouse_original_y==-1.0) {
+                mouse_original_x = x;
+                mouse_original_y = y;
+            }
+            if(mouse_pressed) {
+                // Calculate the estimated distance to roll forward
+                let dist_x = x - mouse_original_x as f64;
+                //let num_frames_to_move: i32 = (dist_x/50.0) as i32 + original_current_frame;
+                let num_frames_to_move: i32 = (dist_x/10.0) as i32 + original_current_frame as i32;
+                let mut new_frame = (original_current_frame as i32 + num_frames_to_move);
+                if new_frame < 0 {
+                    new_frame = 0;
+                }
+                if (new_frame as usize) >= num_frames {
+                    new_frame = num_frames as i32 - 1;
+                }
+
+                demo.set_current_frame(new_frame as u32);
+            }
+        });
     }
 }
 
