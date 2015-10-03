@@ -97,6 +97,9 @@ struct DemoApp {
     width: u32,
     height: u32,
     image: graphics::Image,
+    image_width: u32,
+    image_height: u32,
+    image_aspect: f64,
 }
 
 impl DemoApp {
@@ -115,6 +118,9 @@ impl DemoApp {
             height: 0,
             width: 0,
             image: graphics::Image::new().rect([0.0, 0.0, w as f64, h as f64]),
+            image_width: w,
+            image_height: h,
+            image_aspect: (w as f64) / (h as f64),
         }
     }
 
@@ -127,17 +133,59 @@ impl DemoApp {
         return self.num_frames;
     }
 
-    pub fn get_image_size(&self) -> Size {
+    pub fn get_window_size(&self) -> Size {
         return Size { width: self.width, height: self.height };
     }
 
+    pub fn set_window_size(&mut self, width: u32, height: u32) {
+        self.width = width;
+        self.height = height;
+    }
+
+    fn position_image(&mut self) {
+        let width = self.width as f64;
+        let height = self.height as f64;
+        let top_spacing = 100.0;
+    
+        let mut top_margin = top_spacing as f64;
+        let mut effective_height = height - top_margin;
+        let mut effective_width = effective_height * self.image_aspect;
+        
+        // Is the window not wide enough?
+        if effective_width > width {
+            effective_width = width;
+            effective_height = width / self.image_aspect;
+            top_margin = (height - effective_height - top_spacing) / 2.0 + top_spacing;
+        }
+        let left_margin = (width - effective_width) / 2.0;
+
+        // Position the image
+        self.image = self.image.rect([left_margin, top_margin, effective_width, effective_height] );
+    }
+    
+    fn position_controls(&mut self, c: Context) {
+        self.position_image();
+    }
+
+    fn render_image(&mut self, c: Context, gl: &mut GlGraphics) {
+        let ref tex = self.textures[&self.current_frame];
+        self.image.draw(tex, default_draw_state(), c.transform, gl);
+        return;
+    }
+
+    fn render_background(&mut self, c:Context, gl: &mut GlGraphics) {
+        let COLOR_BACKGROUND = [0.3, 0.3, 0.3, 0.0];
+        clear(COLOR_BACKGROUND, gl);
+    }
+
     pub fn render_frame(&mut self, c: Context, gl: &mut GlGraphics) {
+        self.position_controls(c);
         if !self.textures.contains_key(&self.current_frame) {
             let new_frame = self.current_frame;
             self.load_missing_frame(new_frame);
         }
-        let ref tex = self.textures[&self.current_frame];
-        self.image.draw(tex, default_draw_state(), c.transform, gl);
+        self.render_background(c, gl);
+        self.render_image(c, gl);
         return;
     }
 
@@ -166,7 +214,7 @@ fn main() {
     let window: GlutinWindow =
         WindowSettings::new(
             "Hello Conrod".to_string(),
-            Size { width: 100, height: 100},
+            Size { width: 640, height: 480},
         )
         .opengl(opengl)
         .exit_on_esc(true)
@@ -189,8 +237,7 @@ fn main() {
 
     // Load the initial frame into memory
     let mut demo = DemoApp::new(args.arg_file, args.flag_frame);
-    let sz2 = demo.get_image_size();
-    window.window.set_inner_size(sz2.width, sz2.height);
+    //window.window.set_inner_size(sz2.width, sz2.height);
 
     let event_iter = window.events().ups(60).max_fps(60);
     for event in event_iter {
@@ -199,8 +246,8 @@ fn main() {
         // Should render here
         if let Some(args) = event.render_args() {
             gl.draw(args.viewport(), |c, gl| {
-                clear([1.0, 0.0, 0.4, 0.0], gl);
                 draw_ui(c, gl, &mut ui, &mut demo);
+                println!("x = {}, y = {}", ui.mouse.xy[0], ui.mouse.xy[1]);
                 ui.draw(c, gl);
             });
         }
@@ -229,6 +276,10 @@ fn main() {
            // }
         }
 
+        if let Some(args) = event.resize_args() {
+            demo.set_window_size(args[0], args[1]);
+        }
+
         event.mouse_relative(|dx, dy| println!("Relative mouse moved '{} {}'", dx, dy));
     }
 }
@@ -246,7 +297,6 @@ fn draw_ui(c: Context, gl: &mut GlGraphics, ui: &mut Ui, demo: &mut DemoApp) {
         .set(TITLE, ui);
 
     demo.render_frame(c, gl);
-
 }
 
 widget_ids! {
